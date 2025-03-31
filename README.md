@@ -65,3 +65,7 @@ npm install
 ```bash
 npm run dev #Using Vite
 ```
+
+## Contributors:
+
+-[Karl Gerges](https://github.com/Karl-67)
