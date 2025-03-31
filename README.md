@@ -69,4 +69,4 @@ npm run dev #Using Vite
 ## Contributors:
 
 -[Karl Gerges](https://github.com/Karl-67)
--[@Georgess31](https://github.com/Georgess31)
+-[Georges El Hachem](https://github.com/Georgess31)
