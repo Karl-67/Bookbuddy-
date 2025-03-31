@@ -70,3 +70,4 @@ npm run dev #Using Vite
 
 -[Karl Gerges](https://github.com/Karl-67)
 -[Georges El Hachem](https://github.com/Georgess31)
+-[Sayed Steven Yamine](https://github.com/sstevey)
