@@ -2,12 +2,15 @@ import os
 import wave
 import pyaudio
 import audioop  # For calculating RMS of audio samples
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials/google_speech_key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
+    os.path.dirname(__file__), "..", "credentials", "google_speech_key.json"
+)
+
 from google.cloud import speech
 
 def record_from_microphone(
     filename="temp_audio.wav",
-    silence_threshold=500,     # Adjust this threshold as needed
+    silence_threshold=200,     # Adjust this threshold as needed
     silence_duration=2.5,        # Seconds of silence required to stop recording
     max_record_seconds=60        # Maximum recording length as a safety net
 ):
@@ -48,6 +51,7 @@ def record_from_microphone(
 
         # Calculate RMS value to check for silence
         rms = audioop.rms(data, 2)  # 2 bytes per sample for paInt16
+        #print(f"RMS: {rms}, Silent Chunks: {silent_chunks}/{required_silent_chunks}")
         if rms < silence_threshold:
             silent_chunks += 1
         else:
