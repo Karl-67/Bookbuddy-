@@ -1,7 +1,7 @@
 import torch
-from backend.app.services.pronunciation.dataset import PronunciationClassifier
-from backend.app.services.pronunciation.audio_utils import load_audio
-from backend.app.services.pronunciation.feature_extractor import extract_mfcc
+from .dataset import PronunciationClassifier
+from .audio_utils import load_audio
+from .feature_extractor import extract_mfcc
 import numpy as np
 
 def predict(file_path: str):

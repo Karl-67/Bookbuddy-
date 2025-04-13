@@ -1,7 +1,8 @@
 import torch
-from services.pronunciation.audio_utils import load_audio
-from services.pronunciation.feature_extractor import extract_mfcc
-from services.pronunciation.model import PronunciationClassifier
+from .audio_utils import load_audio
+from .feature_extractor import extract_mfcc
+from .model import PronunciationClassifier
+
 
 def check_pronunciation(audio_path: str) -> dict:
     """
