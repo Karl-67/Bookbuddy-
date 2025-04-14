@@ -1,85 +1,118 @@
 import os
 import wave
-import pyaudio
-import audioop  # For calculating RMS of audio samples
+import sounddevice as sd
+import numpy as np
+from google.cloud import speech
+import time
+
+# Set Google credentials
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
     os.path.dirname(__file__), "..", "credentials", "google_speech_key.json"
 )
 
-from google.cloud import speech
-
-def record_from_microphone(
+def record_until_silence_v2(
     filename="temp_audio.wav",
-    silence_threshold=200,     # Adjust this threshold as needed
-    silence_duration=2.5,        # Seconds of silence required to stop recording
-    max_record_seconds=60        # Maximum recording length as a safety net
+    rate=16000,
+    silence_threshold=100,  # Very low threshold for silence detection
+    pause_threshold=1.0,    # Time of silence before stopping
+    max_duration=30,        # Maximum recording duration
+    energy_buffer_size=10   # How many frames to check for energy level
 ):
     """
-    Records audio from the default microphone until silence is detected.
-
+    Records audio until silence using a different approach based on energy levels.
+    
     Args:
-        filename (str): File to save the recording.
-        silence_threshold (int): RMS threshold to consider as silence.
-        silence_duration (float): Duration in seconds of consecutive silence to stop recording.
-        max_record_seconds (int): Safety limit for recording duration.
-
-    Returns:
-        None: The audio is saved to the specified filename.
+        filename (str): Output file path
+        rate (int): Sample rate
+        silence_threshold (int): Energy level threshold for silence
+        pause_threshold (float): How long silence must persist to stop recording (seconds)
+        max_duration (int): Maximum recording duration (seconds)
+        energy_buffer_size (int): How many previous frames to check for energy
     """
-    chunk = 1024
-    format = pyaudio.paInt16
-    channels = 1
-    rate = 16000  # Sample rate for Google STT
-
-    p = pyaudio.PyAudio()
-    stream = p.open(format=format,
-                    channels=channels,
-                    rate=rate,
-                    input=True,
-                    frames_per_buffer=chunk)
-
-    print("🎙️ Recording... Speak now. (Recording will stop after silence)")
-
-    frames = []
-    silent_chunks = 0
-    required_silent_chunks = int((silence_duration * rate) / chunk)
-    total_chunks = int((max_record_seconds * rate) / chunk)
-
-    for i in range(total_chunks):
-        data = stream.read(chunk)
-        frames.append(data)
-
-        # Calculate RMS value to check for silence
-        rms = audioop.rms(data, 2)  # 2 bytes per sample for paInt16
-        #print(f"RMS: {rms}, Silent Chunks: {silent_chunks}/{required_silent_chunks}")
-        if rms < silence_threshold:
-            silent_chunks += 1
-        else:
-            silent_chunks = 0
-
-        # If enough consecutive silent chunks detected, break out of the loop
-        if silent_chunks >= required_silent_chunks:
-            print("✅ Detected silence. Stopping recording.")
-            break
-
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-
-    # Save the recorded frames as a WAV file
+    print("🎙️ Recording... (speak now, will stop automatically after silence)")
+    
+    # Calculate parameters
+    chunk_size = int(rate * 0.1)  # 100ms chunks for responsive detection
+    max_chunks = int(max_duration * 10)  # 10 chunks per second
+    pause_chunks = int(pause_threshold * 10)  # How many chunks of silence before stopping
+    
+    all_audio = []
+    energy_history = []
+    silent_chunk_count = 0
+    has_speech = False
+    recording_started = time.time()
+    
+    # Create an input stream
+    with sd.InputStream(samplerate=rate, channels=1, dtype='int16', blocksize=chunk_size) as stream:
+        for i in range(max_chunks):
+            # Read audio chunk
+            audio_chunk, _ = stream.read(chunk_size)
+            
+            # Convert to numpy array for processing
+            audio_chunk = audio_chunk.reshape(-1)
+            all_audio.append(audio_chunk)
+            
+            # Calculate energy (squared sum is faster than RMS and works for this purpose)
+            energy = np.sum(np.square(audio_chunk.astype(np.float32))) / len(audio_chunk)
+            energy_history.append(energy)
+            
+            # Keep the history buffer at the right size
+            if len(energy_history) > energy_buffer_size:
+                energy_history.pop(0)
+            
+            # Calculate the average energy from the buffer
+            avg_energy = sum(energy_history) / len(energy_history)
+            
+            # Debug output - uncomment to see values
+            # print(f"Energy: {energy:.1f}, Avg: {avg_energy:.1f}, Silent chunks: {silent_chunk_count}/{pause_chunks}")
+            
+            # Detect if we have speech (needed before we can end on silence)
+            if avg_energy > silence_threshold * 2:  # Higher threshold for speech detection
+                has_speech = True
+                silent_chunk_count = 0
+            elif has_speech and avg_energy < silence_threshold:
+                silent_chunk_count += 1
+            else:
+                silent_chunk_count = 0
+            
+            # Check if we should stop recording
+            if has_speech and silent_chunk_count >= pause_chunks:
+                print("✅ Silence detected, stopping recording.")
+                break
+            
+            # Safety check for max duration
+            if time.time() - recording_started > max_duration:
+                print("⚠️ Maximum recording duration reached.")
+                break
+    
+    # Make sure we have audio
+    if not all_audio:
+        print("⚠️ No audio recorded!")
+        return
+    
+    # Combine all chunks
+    recording = np.concatenate(all_audio)
+    
+    # Remove trailing silence
+    if silent_chunk_count > 0 and len(all_audio) > silent_chunk_count:
+        recording = np.concatenate(all_audio[:-silent_chunk_count])
+    
+    # Save to WAV file
+    duration = len(recording) / rate
+    print(f"✅ Finished recording ({duration:.1f} seconds). Saving to {filename}")
     with wave.open(filename, 'wb') as wf:
-        wf.setnchannels(channels)
-        wf.setsampwidth(p.get_sample_size(format))
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 2 bytes per sample for int16
         wf.setframerate(rate)
-        wf.writeframes(b''.join(frames))
+        wf.writeframes(recording.tobytes())
 
 def transcribe_audio(audio_path: str) -> str:
     """
-    Transcribes speech from an audio file using the Google Cloud Speech-to-Text API.
-    
+    Transcribes speech from an audio file using Google Cloud Speech-to-Text API.
+
     Args:
         audio_path (str): Path to the audio file.
-    
+
     Returns:
         str: The transcribed text.
     """
@@ -93,10 +126,15 @@ def transcribe_audio(audio_path: str) -> str:
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=16000,
-        language_code="en-US"
+        language_code="en-US",
+        enable_automatic_punctuation=True
     )
 
     response = client.recognize(config=config, audio=audio)
+
+    if not response.results:
+        print("⚠️ No transcription returned. Possible silence or bad audio.")
+        return ""
 
     transcript = ""
     for result in response.results:
@@ -105,20 +143,11 @@ def transcribe_audio(audio_path: str) -> str:
     return transcript.strip()
 
 def live_transcribe():
-    """
-    Records from the microphone (with silence detection) and transcribes the audio.
-    
-    Returns:
-        str: The transcribed text.
-    """
     temp_filename = "temp_audio.wav"
-    record_from_microphone(filename=temp_filename)
+    record_until_silence_v2(filename=temp_filename)
     transcript = transcribe_audio(temp_filename)
-    # Optionally, remove the temporary file after transcription.
-    # os.remove(temp_filename)
     return transcript
 
-# Example usage (for testing):
 if __name__ == "__main__":
     print("Starting live transcription...")
     text = live_transcribe()
