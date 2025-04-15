@@ -10,9 +10,9 @@ from google.cloud import speech
 
 def record_from_microphone(
     filename="temp_audio.wav",
-    silence_threshold=200,     # Adjust this threshold as needed
+    silence_threshold=800,     # Adjust this threshold as needed
     silence_duration=2.5,        # Seconds of silence required to stop recording
-    max_record_seconds=60        # Maximum recording length as a safety net
+    max_record_seconds=10        # Maximum recording length as a safety net
 ):
     """
     Records audio from the default microphone until silence is detected.
@@ -44,7 +44,6 @@ def record_from_microphone(
     silent_chunks = 0
     required_silent_chunks = int((silence_duration * rate) / chunk)
     total_chunks = int((max_record_seconds * rate) / chunk)
-
     for i in range(total_chunks):
         data = stream.read(chunk)
         frames.append(data)
@@ -56,7 +55,7 @@ def record_from_microphone(
             silent_chunks += 1
         else:
             silent_chunks = 0
-
+        
         # If enough consecutive silent chunks detected, break out of the loop
         if silent_chunks >= required_silent_chunks:
             print("✅ Detected silence. Stopping recording.")
