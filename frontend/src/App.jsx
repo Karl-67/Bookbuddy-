@@ -15,12 +15,20 @@ export default function App() {
 
       const data = await response.json();
       const userInput = data.transcript;
-      const aiResponse = "Let me explain..."; // Replace with actual AI logic later
+      const aiResponse = data.simplified;
 
       setUserMessages((prev) => [...prev, userInput]);
-      setAIMessages((prev) => [...prev, aiResponse]);
+
+      if (!userInput || userInput.startsWith("❌")) {
+        setAIMessages((prev) => [...prev, "❌ Could not detect speech."]);
+      } else if (!aiResponse || aiResponse.startsWith("❌")) {
+        setAIMessages((prev) => [...prev, "❌ Could not simplify. Try again."]);
+      } else {
+        setAIMessages((prev) => [...prev, aiResponse]);
+      }
     } catch (err) {
       console.error("Error during transcription:", err);
+      setAIMessages((prev) => [...prev, "❌ Something went wrong."]);
     } finally {
       setIsListening(false);
     }
@@ -30,8 +38,6 @@ export default function App() {
     <div style={{
       height: "100vh",
       width: "100vw",
-      margin: 0,
-      padding: 0,
       background: "radial-gradient(ellipse at center, #ede0c1 0%, #d2b48c 100%)",
       display: "flex",
       justifyContent: "center",
@@ -39,15 +45,12 @@ export default function App() {
       fontFamily: "'SF Pro', 'Garamond', 'Georgia', serif",
       color: "#3a2e1e"
     }}>
-      {/* Left filler panel */}
       <div style={{
         width: "80px",
         height: "100%",
         backgroundColor: "#d6c6a3",
         opacity: 0.5
       }} />
-
-      {/* Main content */}
       <div style={{
         flexGrow: 1,
         maxWidth: "1000px",
@@ -63,7 +66,6 @@ export default function App() {
           marginBottom: "1rem",
           textShadow: "1px 1px 2px #5e4a2e"
         }}>BookBuddy</h1>
-
         <div style={{
           display: "flex",
           width: "100%",
@@ -75,7 +77,7 @@ export default function App() {
           border: "5px double #aa9465",
           backdropFilter: "blur(2px)"
         }}>
-          {/* Left - User Speech */}
+          {/* Left: User */}
           <div style={{
             flex: 1,
             backgroundColor: "#f4e8c8",
@@ -89,8 +91,7 @@ export default function App() {
               fontSize: "1.25rem",
               marginBottom: "1rem",
               borderBottom: "1px solid #bca474",
-              paddingBottom: "0.5rem",
-              color: "#2e2415"
+              paddingBottom: "0.5rem"
             }}>You Speaketh</h2>
             {userMessages.map((msg, i) => (
               <div key={i} style={{
@@ -98,14 +99,11 @@ export default function App() {
                 margin: "0.5rem 0",
                 background: "#efe8d1",
                 border: "1px solid #c1b08a",
-                borderRadius: "6px",
-                color: "#443422",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.1)"
+                borderRadius: "6px"
               }}>{msg}</div>
             ))}
           </div>
-
-          {/* Right - AI Response */}
+          {/* Right: AI */}
           <div style={{
             flex: 1,
             backgroundColor: "#f4e8c8",
@@ -118,8 +116,7 @@ export default function App() {
               fontSize: "1.25rem",
               marginBottom: "1rem",
               borderBottom: "1px solid #bca474",
-              paddingBottom: "0.5rem",
-              color: "#2e2415"
+              paddingBottom: "0.5rem"
             }}>The Scribe Responds</h2>
             {aiMessages.map((msg, i) => (
               <div key={i} style={{
@@ -127,15 +124,11 @@ export default function App() {
                 margin: "0.5rem 0",
                 background: "#efe8d1",
                 border: "1px solid #c1b08a",
-                borderRadius: "6px",
-                color: "#443422",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.1)"
+                borderRadius: "6px"
               }}>{msg}</div>
             ))}
           </div>
         </div>
-
-        {/* Push-to-Talk Button */}
         <button onClick={handlePushToTalk} style={{
           marginTop: "2rem",
           padding: "1rem 2.5rem",
@@ -146,14 +139,11 @@ export default function App() {
           color: "#fff4d6",
           border: "2px solid #5a371f",
           cursor: "pointer",
-          boxShadow: "0 6px 12px rgba(0,0,0,0.3)",
-          textShadow: "0 1px 2px rgba(0,0,0,0.4)"
+          boxShadow: "0 6px 12px rgba(0,0,0,0.3)"
         }}>
           {isListening ? "Listening..." : "Invoke the Voice"}
         </button>
       </div>
-
-      {/* Right filler panel */}
       <div style={{
         width: "80px",
         height: "100%",
