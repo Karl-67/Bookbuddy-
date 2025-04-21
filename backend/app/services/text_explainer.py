@@ -1,7 +1,19 @@
+import os
 import openai
+from dotenv import load_dotenv
 
-# Insert your API key directly here for testing (temporary)
-API_KEY = "sk-"  # Replace with your actual API key
+# ✅ Load the .env file
+load_dotenv()
+
+# ✅ Read the OpenAI API key from the file path specified in .env
+def get_openai_key():
+    try:
+        with open(os.getenv("OPEN_AI_CREDENTIALS")) as f:
+            return f.read().strip()
+    except Exception as e:
+        print("❌ Failed to load OpenAI key:", e)
+        return None
+
 
 def simplify_text(text: str) -> str:
     """
@@ -15,12 +27,15 @@ def simplify_text(text: str) -> str:
     """
     prompt = f"Simplify the following text so it's easier to understand:\n\n{text}\n\nSimplified version:"
 
-    try:
+    api_key = get_openai_key()
+    if not api_key:
+        return "❌ OpenAI API key not found."
 
-        client = openai.OpenAI(api_key=API_KEY)
+    try:
+        client = openai.OpenAI(api_key=api_key)
 
         response = client.chat.completions.create(
-            model="gpt-4o",  
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that simplifies complex text."},
                 {"role": "user", "content": prompt}
@@ -29,8 +44,6 @@ def simplify_text(text: str) -> str:
             max_tokens=300
         )
 
-
-
         simplified_text = response.choices[0].message.content.strip()
         return simplified_text
 
@@ -38,9 +51,9 @@ def simplify_text(text: str) -> str:
         print(f"❌ Error simplifying text:\n{e}")
         return "Sorry, I couldn't simplify the text at the moment."
 
-# Test block for standalone runs 
-if __name__ == "__main__":
 
+# ✅ Test block for standalone runs
+if __name__ == "__main__":
     input_text = (
         "Whan that Aprill with his shoures soote the droghte of March hath perced to the roote..."
     )
