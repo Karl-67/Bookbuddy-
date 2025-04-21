@@ -1,11 +1,12 @@
 import os
 import openai
 from dotenv import load_dotenv
+from pathlib import Path
 
-# ✅ Load the .env file
-load_dotenv()
+# Explicitly load the .env file from the project root
+env_path = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=env_path)
 
-# ✅ Read the OpenAI API key from the file path specified in .env
 def get_openai_key():
     try:
         with open(os.getenv("OPEN_AI_CREDENTIALS")) as f:
@@ -14,18 +15,18 @@ def get_openai_key():
         print("❌ Failed to load OpenAI key:", e)
         return None
 
-
 def simplify_text(text: str) -> str:
-    """
-    Simplify the given text using an LLM.
+    print(f"🧾 Simplify Input: '{text}'")  # add this
 
-    Args:
-        text (str): The input book text to be simplified.
+    if not text or not text.strip():
+        return "❌ No speech detected."
 
-    Returns:
-        str: A simplified version of the input text.
-    """
-    prompt = f"Simplify the following text so it's easier to understand:\n\n{text}\n\nSimplified version:"
+    prompt = (
+        "You are a helpful assistant. "
+        "If the input is a question, answer it clearly. "
+        "If it's a complex sentence, simplify it for easier understanding.\n\n"
+        f"Text: {text}\n\nResponse:"
+    )
 
     api_key = get_openai_key()
     if not api_key:
@@ -33,33 +34,17 @@ def simplify_text(text: str) -> str:
 
     try:
         client = openai.OpenAI(api_key=api_key)
-
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that simplifies complex text."},
+                {"role": "system", "content": "You simplify or clarify any input the user gives."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
             max_tokens=300
         )
-
-        simplified_text = response.choices[0].message.content.strip()
-        return simplified_text
+        return response.choices[0].message.content.strip()
 
     except Exception as e:
         print(f"❌ Error simplifying text:\n{e}")
-        return "Sorry, I couldn't simplify the text at the moment."
-
-
-# ✅ Test block for standalone runs
-if __name__ == "__main__":
-    input_text = (
-        "Whan that Aprill with his shoures soote the droghte of March hath perced to the roote..."
-    )
-
-    print("📥 Original Text:\n", input_text)
-
-    simplified = simplify_text(input_text)
-
-    print("\n✅ Simplified Text:\n", simplified)
+        return "❌ Could not simplify. Try again."
