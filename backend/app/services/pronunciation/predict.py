@@ -24,8 +24,8 @@ def predict(file_path: str):
     with torch.no_grad():
         score = model(mfcc_tensor).item()
 
+    # Simplified binary classification output
     return {
-        "score": round(score * 100, 2),
         "status": "Correct" if score > 0.5 else "Incorrect"
     }
 
