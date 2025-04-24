@@ -1,6 +1,6 @@
 import os
 import wave
-import pyaudio
+#import pyaudio
 import audioop  # For calculating RMS of audio samples
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
     os.path.dirname(__file__), "..", "credentials", "google_speech_key.json"
