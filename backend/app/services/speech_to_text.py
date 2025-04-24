@@ -1,6 +1,6 @@
 import os
 import wave
-import pyaudio
+#import pyaudio
 import audioop  # For calculating RMS of audio samples
 from dotenv import load_dotenv
 from google.cloud import speech
