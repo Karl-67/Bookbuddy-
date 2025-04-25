@@ -1,13 +1,29 @@
 import os
 from dotenv import load_dotenv
 from google.cloud import texttospeech
+from google.auth.exceptions import DefaultCredentialsError
+import pygame  # ✅ Replacement for playsound
 
 # ✅ Load the .env file
 load_dotenv()
 
-# ✅ Set the required env variable for Google TTS SDK from the .env
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_TEXT_CREDENTIALS")
-
+def get_credentials():
+    """Get Google Cloud credentials path from environment or .env file"""
+    # Try the Text-to-Speech specific credentials first
+    credentials_path = os.getenv("Text_to_Speech")
+    
+    # If not set, try the general Google credentials
+    if not credentials_path:
+        credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    
+    if not credentials_path:
+        raise ValueError("❌ Missing Google Cloud credentials. Please set Text_to_Speech in .env")
+    
+    if not os.path.exists(credentials_path):
+        raise FileNotFoundError(f"❌ Credentials file not found at: {credentials_path}")
+    
+    print(f"🔍 Using Text-to-Speech credentials from: {credentials_path}")
+    return credentials_path
 
 def synthesize_speech(text: str, output_path="output.mp3") -> str:
     """
@@ -24,6 +40,12 @@ def synthesize_speech(text: str, output_path="output.mp3") -> str:
         return "❌ No text provided for speech synthesis."
 
     try:
+        # Get and verify credentials
+        credentials_path = get_credentials()
+        
+        # Set the credentials for this specific call
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+        
         # ✅ Initialize the Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
 
@@ -51,24 +73,44 @@ def synthesize_speech(text: str, output_path="output.mp3") -> str:
         # ✅ Save the audio file
         with open(output_path, "wb") as out:
             out.write(response.audio_content)
-            print(f"🔊 Audio saved to: {output_path}")
+            print(f"🔊 Audio saved to: {os.path.abspath(output_path)}")
 
         return output_path
 
+    except DefaultCredentialsError as e:
+        print(f"❌ Google Cloud credentials error: {e}")
+        return "❌ Failed to authenticate with Google Cloud. Please check your credentials."
     except Exception as e:
-        print(f"❌ Error during TTS: {e}")
-        return "❌ Failed to synthesize speech."
-
+        print(f"❌ Error during TTS: {str(e)}")
+        return f"❌ Failed to synthesize speech: {str(e)}"
+    finally:
+        # Reset the credentials to avoid affecting other services
+        if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
+            del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
 
 # ✅ Test block for standalone runs
 if __name__ == "__main__":
-    sample_text = (
-        "BookBuddy simplifies complex paragraphs from your textbook. "
-        "This sentence is being converted into speech using Google's API."
-    )
+    try:
+        sample_text = (
+            "BookBuddy simplifies complex paragraphs from your textbook. "
+            "Also stay hydrated with Schweppes!"
+        )
 
-    print("📝 Input Text:")
-    print(sample_text)
+        print("📝 Input Text:")
+        print(sample_text)
 
-    audio_file = synthesize_speech(sample_text)
-    print("✅ Output File:", audio_file)
+        audio_file = synthesize_speech(sample_text)
+        print("✅ Output File:", audio_file)
+
+        # ✅ Play the audio using pygame only if called directly
+        if os.path.exists(audio_file):
+            try:
+                pygame.mixer.init()
+                pygame.mixer.music.load(audio_file)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+            except Exception as e:
+                print(f"❌ Error playing audio: {e}")
+    except Exception as e:
+        print(f"❌ Test failed: {e}")

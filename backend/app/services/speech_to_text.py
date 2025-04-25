@@ -1,16 +1,45 @@
-import os
 import wave
-#import pyaudio
+import pyaudio
 import audioop  # For calculating RMS of audio samples
 from dotenv import load_dotenv
 from google.cloud import speech
+from google.auth.exceptions import DefaultCredentialsError
 
 # ✅ Load the .env file
 load_dotenv()
 
-# ✅ Set the required env variable for Google SDK from the .env
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+import os
 
+# Global client for reuse
+speech_client = None
+
+def get_credentials():
+    """Get Google Cloud credentials path from environment or .env file"""
+    # First try the environment variable
+    credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    
+    # If not set, try the .env file
+    if not credentials_path:
+        credentials_path = os.getenv("Text_to_Speech")
+        if credentials_path:
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+    
+    if not credentials_path:
+        raise ValueError("❌ Missing Google Cloud credentials. Please set GOOGLE_APPLICATION_CREDENTIALS or Text_to_Speech in .env")
+    
+    if not os.path.exists(credentials_path):
+        raise FileNotFoundError(f"❌ Credentials file not found at: {credentials_path}")
+    
+    print(f"🔍 Using credentials from: {credentials_path}")
+    return credentials_path
+
+def get_speech_client():
+    """Get and cache the speech client"""
+    global speech_client
+    if speech_client is None:
+        get_credentials()
+        speech_client = speech.SpeechClient()
+    return speech_client
 
 def record_from_microphone(
     filename="temp_audio.wav",
@@ -69,38 +98,55 @@ def transcribe_audio(audio_path: str) -> str:
     """
     Transcribes speech from an audio file using Google STT API.
     """
-    client = speech.SpeechClient()
+    global speech_client  # Move this to the top of the function
+    
+    try:
+        # Use the cached client instead of creating a new one
+        client = get_speech_client()
 
-    with open(audio_path, "rb") as audio_file:
-        content = audio_file.read()
+        with open(audio_path, "rb") as audio_file:
+            content = audio_file.read()
 
-    audio = speech.RecognitionAudio(content=content)
+        audio = speech.RecognitionAudio(content=content)
 
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-        sample_rate_hertz=16000,
-        language_code="en-US"
-    )
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=16000,
+            language_code="en-US"
+        )
 
-    response = client.recognize(config=config, audio=audio)
+        response = client.recognize(config=config, audio=audio)
 
-    transcript = ""
-    for result in response.results:
-        transcript += result.alternatives[0].transcript + " "
+        transcript = ""
+        for result in response.results:
+            transcript += result.alternatives[0].transcript + " "
 
-    return transcript.strip()
+        return transcript.strip()
+    except DefaultCredentialsError as e:
+        print(f"❌ Google Cloud credentials error: {e}")
+        # Clear client to force re-initialization on next try
+        speech_client = None  # Already declared global at the top
+        raise
+    except Exception as e:
+        print(f"❌ Error during transcription: {e}")
+        # Reset client on any error to force re-initialization
+        speech_client = None  # Already declared global at the top
+        raise
 
 
 def live_transcribe():
-    temp_filename = "temp_audio.wav"
-    record_from_microphone(filename=temp_filename)
-    transcript = transcribe_audio(temp_filename)
+    try:
+        temp_filename = "temp_audio.wav"
+        record_from_microphone(filename=temp_filename)
+        transcript = transcribe_audio(temp_filename)
 
-    print(f"🎧 Transcript: {transcript}")  # 👈 add this
-    if not transcript.strip():
-        return "❌ No speech detected."
-    return transcript
-
+        print(f"🎧 Transcript: {transcript}")
+        if not transcript.strip():
+            return "❌ No speech detected."
+        return transcript
+    except Exception as e:
+        print(f"❌ Error in live transcription: {e}")
+        return f"❌ Error: {str(e)}"
 
 
 # Run it for testing
