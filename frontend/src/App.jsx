@@ -6,6 +6,7 @@ export default function App() {
   const [aiMessages, setAIMessages] = useState([]);
   const [pronunciationScores, setPronunciationScores] = useState([]);
   const [recordingUrls, setRecordingUrls] = useState([]);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
 
   const playAudio = async (text) => {
     try {
@@ -61,6 +62,7 @@ export default function App() {
 
   const handlePushToTalk = async () => {
     setIsListening(true);
+    setFeedbackMessage("Listening to your speech...");
 
     try {
       const response = await fetch("http://localhost:8000/analyze", {
@@ -78,6 +80,15 @@ export default function App() {
       const pronunciationScore = data.pronunciation_score;
       const pronunciationStatus = data.pronunciation_status;
 
+      // Update feedback message based on pronunciation score
+      if (pronunciationScore < 50) {
+        setFeedbackMessage(`Your pronunciation needs improvement (${pronunciationScore.toFixed(1)}%). Try to speak more clearly.`);
+      } else if (pronunciationScore < 75) {
+        setFeedbackMessage(`Your pronunciation is decent (${pronunciationScore.toFixed(1)}%). Keep practicing!`);
+      } else {
+        setFeedbackMessage(`Excellent pronunciation! (${pronunciationScore.toFixed(1)}%)`);
+      }
+
       setUserMessages((prev) => [...prev, userInput]);
       setPronunciationScores((prev) => [...prev, 
         { score: pronunciationScore, status: pronunciationStatus }
@@ -85,8 +96,10 @@ export default function App() {
 
       if (!userInput || userInput.startsWith("❌")) {
         setAIMessages((prev) => [...prev, "❌ Could not detect speech."]);
+        setFeedbackMessage("Could not detect speech. Please try again.");
       } else if (!aiResponse || aiResponse.startsWith("❌")) {
         setAIMessages((prev) => [...prev, "❌ Could not simplify. Try again."]);
+        setFeedbackMessage("Could not process your speech. Please try again.");
       } else {
         setAIMessages((prev) => [...prev, aiResponse]);
         // Play the simplified text as audio (which includes pronunciation feedback if needed)
@@ -95,6 +108,7 @@ export default function App() {
     } catch (err) {
       console.error("Error during analysis:", err);
       setAIMessages((prev) => [...prev, "❌ Something went wrong."]);
+      setFeedbackMessage("Something went wrong. Please try again.");
     } finally {
       setIsListening(false);
     }
@@ -132,10 +146,30 @@ export default function App() {
           marginBottom: "1rem",
           textShadow: "1px 1px 2px #5e4a2e"
         }}>BookBuddy</h1>
+        
+        {/* Pronunciation Feedback Banner */}
+        {feedbackMessage && (
+          <div style={{
+            width: "100%",
+            padding: "0.75rem",
+            marginBottom: "1rem",
+            textAlign: "center",
+            borderRadius: "8px",
+            backgroundColor: "#f0e6cc",
+            border: "1px solid #c1b08a",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            fontSize: "1.1rem",
+            fontWeight: "500",
+            color: "#5a371f"
+          }}>
+            {feedbackMessage}
+          </div>
+        )}
+        
         <div style={{
           display: "flex",
           width: "100%",
-          height: "70vh",
+          height: "65vh",
           background: "#f7efdb",
           boxShadow: "inset 0 0 20px rgba(0, 0, 0, 0.25)",
           borderRadius: "12px",
@@ -181,23 +215,6 @@ export default function App() {
                     }}>
                       Pronunciation: {pronunciationScores[i].score.toFixed(1)}% - {pronunciationScores[i].status}
                     </div>
-                    {pronunciationScores[i].score < 50 && (
-                      <button 
-                        onClick={playRecording}
-                        style={{
-                          marginTop: "0.5rem",
-                          padding: "0.25rem 0.5rem",
-                          borderRadius: "4px",
-                          fontSize: "0.8rem",
-                          backgroundColor: "#f0e6cc",
-                          color: "#5a4a2e",
-                          border: "1px solid #c1b08a",
-                          cursor: "pointer"
-                        }}
-                      >
-                        Listen to Your Recording
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
