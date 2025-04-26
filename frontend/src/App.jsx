@@ -4,31 +4,42 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [userMessages, setUserMessages] = useState([]);
   const [aiMessages, setAIMessages] = useState([]);
+  const [pronunciationScores, setPronunciationScores] = useState([]);
 
   const handlePushToTalk = async () => {
     setIsListening(true);
 
     try {
-      const response = await fetch("http://localhost:8000/transcribe", {
+      const response = await fetch("http://localhost:8000/analyze", {
         method: "POST",
       });
 
-      const data = await response.json();
-      const userInput = data.transcript;
-      const aiResponse = data.simplified;
-
-      setUserMessages((prev) => [...prev, userInput]);
-
-      if (!userInput || userInput.startsWith("❌")) {
-        setAIMessages((prev) => [...prev, "❌ Could not detect speech."]);
-      } else if (!aiResponse || aiResponse.startsWith("❌")) {
-        setAIMessages((prev) => [...prev, "❌ Could not simplify. Try again."]);
-      } else {
-        setAIMessages((prev) => [...prev, aiResponse]);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
       }
+
+      // Get transcript and pronunciation info from headers
+      const transcript = response.headers.get("X-Transcript");
+      const pronunciationScore = response.headers.get("X-Pronunciation-Score");
+      const pronunciationStatus = response.headers.get("X-Pronunciation-Status");
+      // Use the simplified text instead of the full response with pronunciation feedback
+      const simplifiedText = response.headers.get("X-Simplified-Text");
+
+      // Update state with the new information
+      setUserMessages(prev => [...prev, transcript]);
+      setAIMessages(prev => [...prev, simplifiedText]);
+      setPronunciationScores(prev => [...prev, 
+        { score: parseFloat(pronunciationScore), status: pronunciationStatus }
+      ]);
+
+      // Play the audio response (which includes pronunciation feedback if needed)
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.play();
     } catch (err) {
-      console.error("Error during transcription:", err);
-      setAIMessages((prev) => [...prev, "❌ Something went wrong."]);
+      console.error("Error during analysis:", err);
+      setAIMessages(prev => [...prev, "❌ Something went wrong."]);
     } finally {
       setIsListening(false);
     }
@@ -100,7 +111,22 @@ export default function App() {
                 background: "#efe8d1",
                 border: "1px solid #c1b08a",
                 borderRadius: "6px"
-              }}>{msg}</div>
+              }}>
+                {msg}
+                {pronunciationScores[i] && (
+                  <div style={{
+                    marginTop: "0.5rem",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "4px",
+                    fontSize: "0.9rem",
+                    backgroundColor: pronunciationScores[i].score >= 50 ? "#deefd8" : "#f7d9d9",
+                    color: pronunciationScores[i].score >= 50 ? "#2c6e2c" : "#a33c3c",
+                    border: `1px solid ${pronunciationScores[i].score >= 50 ? "#a3c8a3" : "#d8a3a3"}`
+                  }}>
+                    Pronunciation: {pronunciationScores[i].score.toFixed(1)}% - {pronunciationScores[i].status}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
           {/* Right: AI */}
