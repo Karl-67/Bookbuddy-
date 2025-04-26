@@ -5,7 +5,7 @@ class PronunciationClassifier(nn.Module):
     def __init__(self, input_dim=13, hidden_dim=128, num_layers=2, dropout=0.3):
         super().__init__()
         
-        # Bidirectional LSTM with more layers and larger hidden dimension
+        # Bidirectional LSTM with moderate dropout
         self.lstm = nn.LSTM(
             input_dim, 
             hidden_dim, 
@@ -18,11 +18,15 @@ class PronunciationClassifier(nn.Module):
         # Attention mechanism
         self.attention = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(hidden_dim, 1)
         )
         
-        # Fully connected layers with dropout
+        # Fully connected layers
         self.fc = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.ReLU(),
@@ -49,4 +53,5 @@ class PronunciationClassifier(nn.Module):
         # Fully connected layers
         out = self.fc(attended)
         
-        return self.sigmoid(out)
+        # Apply sigmoid with moderate temperature
+        return self.sigmoid(out * 0.8)  # Reduced temperature from 1.5 to 0.8

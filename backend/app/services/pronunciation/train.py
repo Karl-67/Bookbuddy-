@@ -25,10 +25,10 @@ loader = DataLoader(dataset, batch_size=64, shuffle=True)
 # Initialize model with weight decay for regularization
 model = PronunciationClassifier()
 criterion = nn.BCELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=0.001)  # Lower learning rate, added weight decay
+optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.0005)  # Lower learning rate and weight decay
 
 # Training parameters
-num_epochs = 3  # 3 epochs as requested
+num_epochs = 5  # Increased epochs
 checkpoint_frequency = 1  # Save checkpoint every epoch
 best_loss = float('inf')
 
@@ -36,6 +36,7 @@ best_loss = float('inf')
 for epoch in range(num_epochs):
     total_loss = 0
     all_outputs = []
+    all_targets = []
     model.train()  # Set model to training mode
     
     for x, y in loader:
@@ -47,15 +48,21 @@ for epoch in range(num_epochs):
         optimizer.step()
         total_loss += loss.item()
         
-        # Collect predictions for analysis
+        # Collect predictions and targets for analysis
         all_outputs.extend(output.detach().cpu().numpy())
+        all_targets.extend(y.cpu().numpy())
     
     # Calculate statistics
     outputs_array = np.array(all_outputs)
+    targets_array = np.array(all_targets)
     avg_loss = total_loss / len(loader)
     
+    # Calculate accuracy
+    predictions = (outputs_array > 0.5).astype(int)
+    accuracy = np.mean(predictions == targets_array)
+    
     # Print detailed output distribution
-    print(f"Epoch {epoch+1}/{num_epochs} | Avg Loss: {avg_loss:.4f}")
+    print(f"Epoch {epoch+1}/{num_epochs} | Avg Loss: {avg_loss:.4f} | Accuracy: {accuracy:.4f}")
     print(f"Prediction stats - Min: {outputs_array.min():.4f}, Max: {outputs_array.max():.4f}, Mean: {outputs_array.mean():.4f}")
     print(f"Distribution - <0.2: {np.mean(outputs_array < 0.2):.2f}, 0.2-0.8: {np.mean((outputs_array >= 0.2) & (outputs_array <= 0.8)):.2f}, >0.8: {np.mean(outputs_array > 0.8):.2f}")
     

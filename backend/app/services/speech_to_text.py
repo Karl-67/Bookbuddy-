@@ -4,6 +4,7 @@ import audioop  # For calculating RMS of audio samples
 from dotenv import load_dotenv
 from google.cloud import speech
 from google.auth.exceptions import DefaultCredentialsError
+import concurrent.futures
 
 # ✅ Load the .env file
 load_dotenv()
@@ -132,6 +133,52 @@ def transcribe_audio(audio_path: str) -> str:
         # Reset client on any error to force re-initialization
         speech_client = None  # Already declared global at the top
         raise
+
+
+def analyze_and_transcribe():
+    """
+    Records audio, then analyzes pronunciation and transcribes in parallel.
+    Returns both the pronunciation score and transcript.
+    """
+    try:
+        temp_filename = "temp_audio.wav"
+        
+        # Step 1: Record audio
+        record_from_microphone(filename=temp_filename)
+        
+        # Step 2: Run pronunciation analysis and transcription in parallel
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Import predict here to avoid circular imports
+            from app.services.pronunciation.predict import predict
+            
+            # Submit both tasks
+            pronunciation_future = executor.submit(predict, temp_filename)
+            transcript_future = executor.submit(transcribe_audio, temp_filename)
+            
+            # Wait for both to complete
+            pronunciation_result = pronunciation_future.result()
+            transcript = transcript_future.result()
+        
+        if not transcript.strip():
+            return {
+                "error": "❌ No speech detected.",
+                "pronunciation_score": 0,
+                "pronunciation_status": "unknown"
+            }
+            
+        return {
+            "transcript": transcript,
+            "pronunciation_score": pronunciation_result["score"],
+            "pronunciation_status": pronunciation_result["status"]
+        }
+        
+    except Exception as e:
+        print(f"❌ Error in analysis and transcription: {e}")
+        return {
+            "error": str(e),
+            "pronunciation_score": 0,
+            "pronunciation_status": "unknown"
+        }
 
 
 def live_transcribe():
