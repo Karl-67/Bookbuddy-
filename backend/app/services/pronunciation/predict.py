@@ -12,13 +12,21 @@ def predict(file_path: str):
     mfcc_tensor = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0)  # [1, time, features]
 
     model = PronunciationClassifier()
-    # Check if model file exists, if not, create a dummy model for testing
-    model_path = "models/pronunciation_model.pt"
+    # Use the correct path to the model file
+    model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models", "pronunciation_model_final.pt")
+    
     if not os.path.exists(model_path):
         print(f"Warning: Model file {model_path} not found. Creating a dummy model for testing.")
         torch.save(model.state_dict(), model_path)
     
-    model.load_state_dict(torch.load(model_path))
+    # Load the checkpoint and extract the model state dict
+    checkpoint = torch.load(model_path)
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        # If it's not a checkpoint, try loading it directly
+        model.load_state_dict(checkpoint)
+    
     model.eval()
 
     with torch.no_grad():
