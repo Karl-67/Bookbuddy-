@@ -5,95 +5,11 @@ export default function App() {
   const [userMessages, setUserMessages] = useState([]);
   const [aiMessages, setAIMessages] = useState([]);
 
-  const speakText = async (text) => {
-    try {
-      console.log("Sending TTS request with text:", text);
-      
-      const ttsRes = await fetch("http://localhost:8000/tts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      console.log("TTS Response status:", ttsRes.status);
-      console.log("TTS Response headers:", Object.fromEntries(ttsRes.headers.entries()));
-
-      if (!ttsRes.ok) {
-        const errorText = await ttsRes.text();
-        console.error("TTS request failed:", errorText);
-        return;
-      }
-
-      // Get the audio blob
-      const blob = await ttsRes.blob();
-      console.log("Received audio blob:", {
-        type: blob.type,
-        size: blob.size,
-        blob: blob
-      });
-      
-      if (blob.size === 0) {
-        console.error("Received empty audio blob");
-        return;
-      }
-      
-      // Create a URL for the blob
-      const audioUrl = URL.createObjectURL(blob);
-      console.log("Created audio URL:", audioUrl);
-      
-      // Create a new Audio object
-      const audio = new Audio(audioUrl);
-      
-      // Add event listeners for debugging
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-      };
-      
-      audio.oncanplaythrough = () => {
-        console.log("Audio is ready to play");
-      };
-      
-      audio.onloadeddata = () => {
-        console.log("Audio data loaded");
-      };
-      
-      audio.onloadstart = () => {
-        console.log("Audio loading started");
-      };
-      
-      // Play the audio
-      try {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log("Audio playback started");
-            })
-            .catch(err => {
-              console.error("Error playing audio:", err);
-            });
-        }
-      } catch (err) {
-        console.error("Error in audio.play():", err);
-      }
-      
-      // Clean up the URL when done
-      audio.onended = () => {
-        console.log("Audio playback ended");
-        URL.revokeObjectURL(audioUrl);
-      };
-    } catch (err) {
-      console.error("Error in speakText:", err);
-    }
-  };
-
   const handlePushToTalk = async () => {
     setIsListening(true);
 
     try {
-      const response = await fetch("http://localhost:8000/transcribe", {
+      const response = await fetch("http://localhost:8000/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -119,11 +35,10 @@ export default function App() {
         setAIMessages((prev) => [...prev, "❌ Could not simplify. Try again."]);
       } else {
         setAIMessages((prev) => [...prev, aiResponse]);
-        speakText(aiResponse); // 🔊 Play AI response
       }
     } catch (err) {
-      console.error("Transcription error:", err);
-      setAIMessages((prev) => [...prev, `❌ Error: ${err.message}`]);
+      console.error("Error during transcription:", err);
+      setAIMessages((prev) => [...prev, "❌ Something went wrong."]);
     } finally {
       setIsListening(false);
     }
@@ -195,7 +110,22 @@ export default function App() {
                 background: "#efe8d1",
                 border: "1px solid #c1b08a",
                 borderRadius: "6px"
-              }}>{msg}</div>
+              }}>
+                {msg}
+                {pronunciationScores[i] && (
+                  <div style={{
+                    marginTop: "0.5rem",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "4px",
+                    fontSize: "0.9rem",
+                    backgroundColor: pronunciationScores[i].score >= 50 ? "#deefd8" : "#f7d9d9",
+                    color: pronunciationScores[i].score >= 50 ? "#2c6e2c" : "#a33c3c",
+                    border: `1px solid ${pronunciationScores[i].score >= 50 ? "#a3c8a3" : "#d8a3a3"}`
+                  }}>
+                    Pronunciation: {pronunciationScores[i].score.toFixed(1)}% - {pronunciationScores[i].status}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
