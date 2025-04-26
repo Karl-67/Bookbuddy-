@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from speech_to_text import live_transcribe
 from text_explainer import simplify_text
 from text_to_speech import synthesize_speech
+from pronunciation.predict import predict
 from dotenv import load_dotenv
 import uvicorn
 import time
@@ -45,6 +46,71 @@ async def transcribe_and_simplify():
         return JSONResponse(
             status_code=500,
             content={"error": f"Failed to transcribe: {str(e)}"}
+        )
+
+@app.get("/get-recording")
+async def get_recording():
+    """Returns the user's last recording as an audio file"""
+    try:
+        audio_path = "temp_audio.wav"
+        if not os.path.exists(audio_path):
+            return JSONResponse(
+                status_code=404,
+                content={"error": "No recording found"}
+            )
+            
+        return FileResponse(
+            audio_path,
+            media_type="audio/wav",
+            filename="user_recording.wav"
+        )
+    except Exception as e:
+        print(f"Error serving recording: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to serve recording: {str(e)}"}
+        )
+
+@app.post("/analyze")
+async def analyze_pronunciation():
+    try:
+        # Step 1: Record audio and transcribe
+        transcript = live_transcribe()
+        if not transcript or transcript.startswith("❌"):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Failed to transcribe speech"}
+            )
+            
+        # Step 2: Run pronunciation prediction on the audio
+        # The live_transcribe function saves audio to temp_audio.wav
+        pronunciation_result = predict("temp_audio.wav")
+        
+        # Step 3: Generate the simplified text response
+        simplified_text = simplify_text(transcript)
+        
+        # Step 4: Determine the appropriate response based on pronunciation score
+        if pronunciation_result["score"] < 50:  # Threshold for "bad" pronunciation
+            # Add pronunciation feedback to the simplified response
+            feedback = f"I noticed your pronunciation could use some improvement. Your pronunciation score was {pronunciation_result['score']}%. Try speaking more clearly and practicing the difficult sounds. "
+            response_text = feedback + simplified_text
+            
+            # Update the simplified text to include the feedback
+            simplified_text = response_text
+        
+        # Return JSON response that matches what the frontend expects
+        return {
+            "transcript": transcript,
+            "simplified": simplified_text,
+            "pronunciation_score": pronunciation_result["score"],
+            "pronunciation_status": pronunciation_result["status"]
+        }
+        
+    except Exception as e:
+        print(f"Error in analyze endpoint: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to analyze: {str(e)}"}
         )
 
 @app.post("/tts")

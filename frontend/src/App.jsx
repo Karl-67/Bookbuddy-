@@ -4,6 +4,60 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [userMessages, setUserMessages] = useState([]);
   const [aiMessages, setAIMessages] = useState([]);
+  const [pronunciationScores, setPronunciationScores] = useState([]);
+  const [recordingUrls, setRecordingUrls] = useState([]);
+
+  const playAudio = async (text) => {
+    try {
+      const response = await fetch("http://localhost:8000/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate audio");
+      }
+
+      // Create a blob from the response
+      const blob = await response.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      
+      // Play the audio
+      const audio = new Audio(audioUrl);
+      audio.play();
+
+      // Clean up the URL after playing
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+    } catch (err) {
+      console.error("Error playing audio:", err);
+    }
+  };
+
+  const playRecording = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/get-recording");
+      if (!response.ok) {
+        throw new Error("Failed to get recording");
+      }
+      
+      const blob = await response.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      
+      const audio = new Audio(audioUrl);
+      audio.play();
+      
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+    } catch (err) {
+      console.error("Error playing recording:", err);
+    }
+  };
 
   const handlePushToTalk = async () => {
     setIsListening(true);
@@ -11,23 +65,23 @@ export default function App() {
     try {
       const response = await fetch("http://localhost:8000/analyze", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to transcribe");
+        throw new Error(errorData.error || "Failed to analyze speech");
       }
 
       const data = await response.json();
       const userInput = data.transcript;
       const aiResponse = data.simplified;
+      const pronunciationScore = data.pronunciation_score;
+      const pronunciationStatus = data.pronunciation_status;
 
       setUserMessages((prev) => [...prev, userInput]);
+      setPronunciationScores((prev) => [...prev, 
+        { score: pronunciationScore, status: pronunciationStatus }
+      ]);
 
       if (!userInput || userInput.startsWith("❌")) {
         setAIMessages((prev) => [...prev, "❌ Could not detect speech."]);
@@ -35,9 +89,11 @@ export default function App() {
         setAIMessages((prev) => [...prev, "❌ Could not simplify. Try again."]);
       } else {
         setAIMessages((prev) => [...prev, aiResponse]);
+        // Play the simplified text as audio (which includes pronunciation feedback if needed)
+        await playAudio(aiResponse);
       }
     } catch (err) {
-      console.error("Error during transcription:", err);
+      console.error("Error during analysis:", err);
       setAIMessages((prev) => [...prev, "❌ Something went wrong."]);
     } finally {
       setIsListening(false);
@@ -113,16 +169,35 @@ export default function App() {
               }}>
                 {msg}
                 {pronunciationScores[i] && (
-                  <div style={{
-                    marginTop: "0.5rem",
-                    padding: "0.25rem 0.5rem",
-                    borderRadius: "4px",
-                    fontSize: "0.9rem",
-                    backgroundColor: pronunciationScores[i].score >= 50 ? "#deefd8" : "#f7d9d9",
-                    color: pronunciationScores[i].score >= 50 ? "#2c6e2c" : "#a33c3c",
-                    border: `1px solid ${pronunciationScores[i].score >= 50 ? "#a3c8a3" : "#d8a3a3"}`
-                  }}>
-                    Pronunciation: {pronunciationScores[i].score.toFixed(1)}% - {pronunciationScores[i].status}
+                  <div>
+                    <div style={{
+                      marginTop: "0.5rem",
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "4px",
+                      fontSize: "0.9rem",
+                      backgroundColor: pronunciationScores[i].score >= 50 ? "#deefd8" : "#f7d9d9",
+                      color: pronunciationScores[i].score >= 50 ? "#2c6e2c" : "#a33c3c",
+                      border: `1px solid ${pronunciationScores[i].score >= 50 ? "#a3c8a3" : "#d8a3a3"}`
+                    }}>
+                      Pronunciation: {pronunciationScores[i].score.toFixed(1)}% - {pronunciationScores[i].status}
+                    </div>
+                    {pronunciationScores[i].score < 50 && (
+                      <button 
+                        onClick={playRecording}
+                        style={{
+                          marginTop: "0.5rem",
+                          padding: "0.25rem 0.5rem",
+                          borderRadius: "4px",
+                          fontSize: "0.8rem",
+                          backgroundColor: "#f0e6cc",
+                          color: "#5a4a2e",
+                          border: "1px solid #c1b08a",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Listen to Your Recording
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
