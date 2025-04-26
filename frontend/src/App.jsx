@@ -192,7 +192,7 @@ export default function App() {
               marginBottom: "1rem",
               borderBottom: "1px solid #bca474",
               paddingBottom: "0.5rem"
-            }}>You Speaketh</h2>
+            }}>You Ask...</h2>
             {userMessages.map((msg, i) => (
               <div key={i} style={{
                 padding: "0.75rem",
@@ -235,7 +235,7 @@ export default function App() {
               marginBottom: "1rem",
               borderBottom: "1px solid #bca474",
               paddingBottom: "0.5rem"
-            }}>The Scribe Responds</h2>
+            }}>We respond!</h2>
             {aiMessages.map((msg, i) => (
               <div key={i} style={{
                 padding: "0.75rem",
