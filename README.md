@@ -13,6 +13,11 @@ BookBuddy is an AI-powered assistant that helps users understand and pronounce c
 
 ---
 
+## Disclaimer
+
+The pronunciation feedback feature may not always provide fully accurate scores.
+This is because the model was trained on a dataset that contained certain biases, which could affect performance across different accents and speaking styles.
+
 ## 🧠 Project Structure
 
 ```bash
@@ -27,6 +32,11 @@ BookBuddy/
 
 1. Install Python 3.12 or higher
 2. Navigate to the backend folder
+
+```bash
+cd backend
+```
+
 3. Create a virtual environment:
 
 ```bash
